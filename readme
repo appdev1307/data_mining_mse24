@@ -1,0 +1,29 @@
+**Submission Deadline:**
+12:00 PM on 12/08/2025**
+
+**Email Title:**
+`MSE K25HN_DAM501_Fullname`
+
+**Send the Drive link** (in **shared mode**) to:
+📧 **[hungbkhn@gmail.com](mailto:hungbkhn@gmail.com)**
+
+**Drive contents must include:**
+* Dataset files
+* Notebook file
+* Screenshot proving completion of the **Coursera course**
+
+**Final (online) presentation:**
+📅 **On the last session: 17/08 (as scheduled)**
+
+
+### 📘 Assignment:
+
+Each student selects **one dataset** from:
+https://www.kaggle.com/discussions/general/210203 
+
+*(You can decide your own values for min support and min confidence)*
+
+* Mine **frequent patterns** using the **maxFP-growth algorithm**. Generate **association rules** from frequent itemsets.
+  ➤ For students with **even student ID numbers**
+
+**Programming language:** Python
