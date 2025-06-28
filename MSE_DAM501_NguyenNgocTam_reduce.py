@@ -1,5 +1,5 @@
 # ------------------------------------------------------
-# Optimized GSE2361 FP-Growth Analysis with Association Rules (5,000 x 10 Subset)
+# Optimized GSE2361 FP-Growth Analysis with Association Rules (200 x 37 Subset)
 # ------------------------------------------------------
 
 import pandas as pd
@@ -20,7 +20,7 @@ print("🔄 Step 1: Loading gene expression data from GSE2361...")
 start_time = time.time()
 
 # === LOAD DATA ===
-file_path = "/GSE2361_series_matrix.txt"  # Ensure file is unzipped
+file_path = "GSE2361_series_matrix.txt"  # Ensure file is unzipped
 try:
     df_raw = pd.read_csv(file_path, sep="\t", comment='!', skiprows=0, dtype={0: str}, low_memory=False)
 except Exception as e:
@@ -31,8 +31,8 @@ df_raw.columns = df_raw.columns.str.strip()
 df_raw = df_raw.rename(columns={df_raw.columns[0]: "PROBE_ID"})
 df_raw = df_raw.dropna()
 
-# Subset to 5,000 genes x 10 samples for testing
-df_raw = df_raw.iloc[:5000, :10]
+# Subset to 200 genes x 37 columns (PROBE_ID + 36 samples)
+df_raw = df_raw.iloc[:300, :37]
 
 print("✅ Loaded and subset raw matrix with shape:", df_raw.shape)
 print_time("Loading and subsetting", start_time)
@@ -62,16 +62,26 @@ if not df_raw.select_dtypes(include=['float32']).shape[1] == df_raw.shape[1]:
     print("⚠️ Warning: Some columns are still non-numeric after conversion!")
     raise ValueError("Non-numeric data remains in DataFrame")
 
+# Diagnostic: Print data range to guide threshold selection
+print(f"Data range: {df_raw.min().min():.2f} to {df_raw.max().max():.2f}")
+# Diagnostic: Print quantiles to guide threshold
+quantiles = df_raw.quantile([0.5, 0.75, 0.9, 0.95]).transpose()
+print("Quantiles (median, 75th, 90th, 95th):\n", quantiles)
+
 print("✅ Cleaned matrix shape:", df_raw.shape)
 print_time("Cleaning and formatting", start_time)
 
 # === BINARIZE ===
-print("🔎 Step 3: Binarizing expression (threshold > 7.0)...")
+print("🔎 Step 3: Binarizing expression (threshold > 100.0)...")
 start_time = time.time()
 
-# Increase threshold to reduce transaction size
-threshold = 7.0
+# Higher threshold based on data range
+threshold = 100.0
 df_bin = df_raw > threshold
+
+# Diagnostic: Percentage of genes above threshold
+pct_above_threshold = df_bin.mean().mean() * 100
+print(f"Percentage of genes above threshold: {pct_above_threshold:.2f}%")
 
 print(f"✅ Binarization complete. Sample shape: {df_bin.shape}")
 print_time("Binarization", start_time)
@@ -107,8 +117,8 @@ print_time("Transaction encoding", start_time)
 print("🌲 Step 6: Running FP-Growth algorithm...")
 start_time = time.time()
 
-# Optimization: Adjust min_support for 10 samples
-min_support = 0.7  # ~7/10 samples
+# Optimization: Adjust min_support for 36 samples
+min_support = 0.7  # ~25/36 samples
 frequent_itemsets = fpgrowth(df_encoded, min_support=min_support, use_colnames=True, max_len=2)
 
 print(f"✅ Found {len(frequent_itemsets)} frequent itemsets (min_support={min_support})")
@@ -118,7 +128,7 @@ print_time("FP-Growth", start_time)
 print("🔗 Step 7: Generating association rules...")
 start_time = time.time()
 
-# Optimization: Higher min_confidence for fewer rules
+# Optimization: High min_confidence for fewer rules
 min_confidence = 0.9
 rules = association_rules(frequent_itemsets, metric="confidence", min_threshold=min_confidence)
 rules_sorted = rules.sort_values(by='lift', ascending=False)
