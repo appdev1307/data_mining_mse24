@@ -1,0 +1,69 @@
+## 📊 Step 6: Plot — What It Does
+
+### 📍 **Code Block:**
+
+```python
+plt.figure(figsize=(10, 6))
+sns.scatterplot(
+    data=rules,
+    x='support',
+    y='confidence',
+    size='lift',
+    hue='lift',
+    palette='cool',
+    sizes=(100, 800)
+)
+plt.title("GSE2361: FP-Growth Rules (Optimized)")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+```
+
+---
+
+## 📈 What Each Element Means
+
+| Plot Element           | What It Represents                                                           |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| **X-axis: Support**    | How often the rule occurs across all samples (e.g., `{GeneA, GeneB}` in 40%) |
+| **Y-axis: Confidence** | How often the rule is true when condition is met (e.g., `GeneA → GeneB` 80%) |
+| **Size of dot: Lift**  | How much more likely GeneB is if GeneA is present (vs. by chance)            |
+| **Color (Hue): Lift**  | Same as size — higher lift = stronger rule                                   |
+| **Each dot**           | One **association rule**, e.g., `{GeneA} → {GeneB}`                          |
+
+---
+
+## 🎯 Why This Plot Matters
+
+It helps you **quickly identify the most meaningful and surprising gene co-expression patterns**:
+
+### 🟢 **Big, bright dots**
+
+* High support → common
+* High confidence → reliable
+* High lift → strong dependency
+* ✅ These are the **best rules** biologically or statistically
+
+### 🔴 **Tiny dots or low confidence**
+
+* May be rare or weak relationships
+* Use for exploratory insight only
+
+---
+
+## 🧠 Example Rule
+
+Imagine a dot on the plot represents:
+
+> `{TP53} → {BRCA1}`
+> Support: 0.4
+> Confidence: 0.85
+> Lift: 2.1
+
+This means:
+
+* In 40% of samples, both are co-expressed
+* In 85% of samples with TP53 expression, BRCA1 is also expressed
+* This is 2.1× more likely than random chance → **strong rule**
+
+
