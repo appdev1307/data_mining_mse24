@@ -32,7 +32,7 @@ df_raw = df_raw.rename(columns={df_raw.columns[0]: "PROBE_ID"})
 df_raw = df_raw.dropna()
 
 # Subset to 200 genes x 37 columns (PROBE_ID + 36 samples)
-df_raw = df_raw.iloc[:300, :37]
+df_raw = df_raw.iloc[:400, :37]
 
 print("✅ Loaded and subset raw matrix with shape:", df_raw.shape)
 print_time("Loading and subsetting", start_time)
