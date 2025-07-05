@@ -1,0 +1,11 @@
+* Mine **frequent patterns** using the **maxFP-growth algorithm**. Generate **association rules** from frequent itemsets.
+language: python
+dataset: https://www.kaggle.com/datasets/pratyushpuri/global-ai-job-market-trend-2025/data
+
+
+import kagglehub
+
+# Download latest version
+path = kagglehub.dataset_download("pratyushpuri/global-ai-job-market-trend-2025")
+
+print("Path to dataset files:", path)
