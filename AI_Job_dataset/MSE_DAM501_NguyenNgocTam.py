@@ -19,7 +19,7 @@ def log_progress(text_widget, message):
     text_widget.update()
 
 # Main analysis function
-def run_analysis(min_support_entry, min_confidence_entry, progress_text, itemsets_tree, rules_tree, itemsets_plot_frame, rules_plot_frame):
+def run_analysis(min_support_entry, min_confidence_entry, progress_text, itemsets_tree, rules_tree, itemsets_plot_frame, rules_plot_frame, summary_text):
     try:
         min_support = float(min_support_entry.get())
         min_confidence = float(min_confidence_entry.get())
@@ -29,10 +29,21 @@ def run_analysis(min_support_entry, min_confidence_entry, progress_text, itemset
         messagebox.showerror("Input Error", f"Error: {e}. Please enter valid numbers.")
         return
 
-    # Clear previous progress log
+    # Clear previous content
     progress_text.config(state='normal')
     progress_text.delete(1.0, tk.END)
     progress_text.config(state='disabled')
+    summary_text.config(state='normal')
+    summary_text.delete(1.0, tk.END)
+    summary_text.config(state='disabled')
+    for item in itemsets_tree.get_children():
+        itemsets_tree.delete(item)
+    for item in rules_tree.get_children():
+        rules_tree.delete(item)
+    for widget in itemsets_plot_frame.winfo_children():
+        widget.destroy()
+    for widget in rules_plot_frame.winfo_children():
+        widget.destroy()
 
     log_progress(progress_text, "Loading and preprocessing data...")
     try:
@@ -86,14 +97,10 @@ def run_analysis(min_support_entry, min_confidence_entry, progress_text, itemset
         f.write(rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']].to_string())
 
     log_progress(progress_text, "Populating itemsets table...")
-    for item in itemsets_tree.get_children():
-        itemsets_tree.delete(item)
     for _, row in maximal_itemsets.iterrows():
         itemsets_tree.insert('', 'end', values=(', '.join(list(row['itemsets'])), f"{row['support']:.4f}"))
 
     log_progress(progress_text, "Populating rules table...")
-    for item in rules_tree.get_children():
-        rules_tree.delete(item)
     if rules.empty:
         rules_tree.insert('', 'end', values=("No rules generated.", "", "", "", ""))
     else:
@@ -106,17 +113,62 @@ def run_analysis(min_support_entry, min_confidence_entry, progress_text, itemset
                 f"{row['lift']:.4f}"
             ))
 
-    log_progress(progress_text, "Rendering plots...")
-    # Clear previous plots
-    for widget in itemsets_plot_frame.winfo_children():
-        widget.destroy()
-    for widget in rules_plot_frame.winfo_children():
-        widget.destroy()
+    log_progress(progress_text, "Populating summary...")
+    summary_text.config(state='normal')
+    summary_text.delete(1.0, tk.END)
+    summary_text.insert(tk.END, "Frequent Pattern Mining Summary for AI Job Skills\n")
+    summary_text.insert(tk.END, "=" * 50 + "\n\n")
+    summary_text.insert(tk.END, "Dataset Context:\n")
+    summary_text.insert(tk.END, "  Analyzed required skills from AI job postings to identify frequently occurring skill sets and their relationships.\n")
+    summary_text.insert(tk.END, f"  Analysis parameters: min_support = {min_support:.2f}, min_confidence = {min_confidence:.2f}\n\n")
+    summary_text.insert(tk.END, "Maximal Frequent Itemsets:\n")
+    summary_text.insert(tk.END, f"  Total found: {len(maximal_itemsets)}\n")
+    summary_text.insert(tk.END, "  These itemsets represent skill combinations that appear in at least "
+                        f"{min_support*100:.1f}% of job postings and are not subsets of other frequent itemsets.\n")
+    if not maximal_itemsets.empty:
+        summary_text.insert(tk.END, "  Top 5 by support (indicating most common skills):\n")
+        top_itemsets = maximal_itemsets.sort_values(by='support', ascending=False).head(5)
+        for i, (_, row) in enumerate(top_itemsets.iterrows(), 1):
+            summary_text.insert(tk.END, f"    {i}. {', '.join(list(row['itemsets']))}: {row['support']*100:.1f}% of jobs require this skill set.\n")
+        support_range = (maximal_itemsets['support'].min(), maximal_itemsets['support'].max())
+        summary_text.insert(tk.END, f"  Support range: {support_range[0]*100:.1f}% to {support_range[1]*100:.1f}% of jobs.\n")
+    else:
+        summary_text.insert(tk.END, "  No itemsets found meeting the support threshold.\n")
+    summary_text.insert(tk.END, "\nAssociation Rules:\n")
+    summary_text.insert(tk.END, f"  Total found: {len(rules)}\n")
+    summary_text.insert(tk.END, "  These rules indicate strong skill co-occurrence patterns (if A, then B with high confidence).\n")
+    if not rules.empty:
+        summary_text.insert(tk.END, "  Top 5 by confidence (strongest skill associations):\n")
+        top_rules = rules.sort_values(by='confidence', ascending=False).head(5)
+        for i, (_, row) in enumerate(top_rules.iterrows(), 1):
+            summary_text.insert(tk.END, f"    {i}. {', '.join(list(row['antecedents']))} → {', '.join(list(row['consequents']))}: "
+                                       f"{row['confidence']*100:.1f}% confidence, {row['lift']:.2f}x more likely than random, "
+                                       f"support {row['support']*100:.1f}%.\n")
+        confidence_range = (rules['confidence'].min(), rules['confidence'].max())
+        lift_range = (rules['lift'].min(), rules['lift'].max())
+        summary_text.insert(tk.END, f"  Confidence range: {confidence_range[0]*100:.1f}% to {confidence_range[1]*100:.1f}%.\n")
+        summary_text.insert(tk.END, f"  Lift range: {lift_range[0]:.2f}x to {lift_range[1]:.2f}x (values >1 indicate positive correlation).\n")
+        max_lift_rule = rules.loc[rules['lift'].idxmax()] if len(rules) > 0 else None
+        if max_lift_rule is not None:
+            summary_text.insert(tk.END, f"  Strongest correlation: {', '.join(list(max_lift_rule['antecedents']))} → "
+                                       f"{', '.join(list(max_lift_rule['consequents']))} (lift: {max_lift_rule['lift']:.2f}x).\n")
+    else:
+        summary_text.insert(tk.END, "  No rules generated meeting the confidence threshold.\n")
+    summary_text.insert(tk.END, "\nKey Insights:\n")
+    if not maximal_itemsets.empty:
+        summary_text.insert(tk.END, "  - The most common skills (e.g., top itemsets) are critical for AI job roles, reflecting high demand.\n")
+    if not rules.empty:
+        summary_text.insert(tk.END, "  - Strong rules (high confidence/lift) suggest skill combinations often required together, "
+                                   "useful for job seekers to prioritize learning.\n")
+    else:
+        summary_text.insert(tk.END, "  - Lower the thresholds to discover more skill relationships.\n")
+    summary_text.config(state='disabled')
 
+    log_progress(progress_text, "Rendering plots...")
     # Itemsets plot
     top_20_itemsets = maximal_itemsets.sort_values(by='support', ascending=False).head(20)
     itemset_labels = [', '.join(list(itemset)) for itemset in top_20_itemsets['itemsets']]
-    itemset_fig_width = max(5, min(len(itemset_labels) * 0.3, 8))  # Dynamic width, capped at 8
+    itemset_fig_width = max(5, min(len(itemset_labels) * 0.3, 8))
     fig1, ax1 = plt.subplots(figsize=(itemset_fig_width, 2.5))
     ax1.bar(itemset_labels, top_20_itemsets['support'], color='skyblue', edgecolor='black')
     ax1.set_xlabel('Itemsets')
@@ -299,11 +351,25 @@ itemsets_plot_frame.pack(pady=5, padx=5, fill='both', expand=True)
 rules_plot_frame = tk.LabelFrame(plots_tab, text="Association Rules Confidence Plot")
 rules_plot_frame.pack(pady=5, padx=5, fill='both', expand=True)
 
+# Summary tab
+summary_tab = tk.Frame(notebook)
+notebook.add(summary_tab, text="Summary")
+
+# Summary text
+summary_frame = tk.LabelFrame(summary_tab, text="Results Summary")
+summary_frame.pack(pady=5, padx=5, fill='both', expand=True)
+summary_scrollbar_y = ttk.Scrollbar(summary_frame, orient='vertical')
+summary_scrollbar_y.pack(side='right', fill='y')
+summary_text = tk.Text(summary_frame, height=10, wrap='word', yscrollcommand=summary_scrollbar_y.set)
+summary_text.pack(fill='both', expand=True)
+summary_scrollbar_y.config(command=summary_text.yview)
+summary_text.config(state='disabled')
+
 # Run button
 run_button = tk.Button(input_frame, text="Run Analysis",
                        command=lambda: run_analysis(min_support_entry, min_confidence_entry,
                                                    progress_text, itemsets_tree, rules_tree,
-                                                   itemsets_plot_frame, rules_plot_frame))
+                                                   itemsets_plot_frame, rules_plot_frame, summary_text))
 run_button.grid(row=2, column=0, columnspan=2, pady=5)
 
 root.mainloop()
