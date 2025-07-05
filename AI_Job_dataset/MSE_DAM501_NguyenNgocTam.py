@@ -7,6 +7,9 @@ from tkinter import ttk, messagebox
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import json
 
+# Force TkAgg backend for Matplotlib
+plt.switch_backend('TkAgg')
+
 # Function to log progress
 def log_progress(text_widget, message):
     text_widget.config(state='normal')
@@ -16,7 +19,7 @@ def log_progress(text_widget, message):
     text_widget.update()
 
 # Main analysis function
-def run_analysis(min_support_entry, min_confidence_entry, progress_text, itemsets_tree, rules_tree, itemsets_plot_canvas, rules_plot_canvas):
+def run_analysis(min_support_entry, min_confidence_entry, progress_text, itemsets_tree, rules_tree, itemsets_plot_frame, rules_plot_frame):
     try:
         min_support = float(min_support_entry.get())
         min_confidence = float(min_confidence_entry.get())
@@ -105,47 +108,47 @@ def run_analysis(min_support_entry, min_confidence_entry, progress_text, itemset
 
     log_progress(progress_text, "Rendering plots...")
     # Clear previous plots
-    for widget in itemsets_plot_canvas.winfo_children():
+    for widget in itemsets_plot_frame.winfo_children():
         widget.destroy()
-    for widget in rules_plot_canvas.winfo_children():
+    for widget in rules_plot_frame.winfo_children():
         widget.destroy()
 
     # Itemsets plot
     top_20_itemsets = maximal_itemsets.sort_values(by='support', ascending=False).head(20)
     itemset_labels = [', '.join(list(itemset)) for itemset in top_20_itemsets['itemsets']]
-    itemset_fig_width = max(6, len(itemset_labels) * 0.4)  # Dynamic width
-    fig1, ax1 = plt.subplots(figsize=(itemset_fig_width, 3))
+    itemset_fig_width = max(5, min(len(itemset_labels) * 0.3, 8))  # Dynamic width, capped at 8
+    fig1, ax1 = plt.subplots(figsize=(itemset_fig_width, 2.5))
     ax1.bar(itemset_labels, top_20_itemsets['support'], color='skyblue', edgecolor='black')
     ax1.set_xlabel('Itemsets')
     ax1.set_ylabel('Support')
-    ax1.set_title(f'Top 20 Maximal Frequent Itemsets (min_support={min_support})')
-    plt.xticks(rotation=45, ha='right')
+    ax1.set_title(f'Top 20 Itemsets (min_support={min_support})')
+    plt.xticks(rotation=45, ha='right', fontsize=8)
     plt.tight_layout()
-    canvas1 = FigureCanvasTkAgg(fig1, master=itemsets_plot_canvas)
+    canvas1 = FigureCanvasTkAgg(fig1, master=itemsets_plot_frame)
     canvas1.draw()
-    canvas1.get_tk_widget().pack(side='left', fill='both', expand=True)
-    itemsets_plot_canvas.configure(scrollregion=itemsets_plot_canvas.bbox('all'))
+    canvas1.get_tk_widget().pack(fill='both', expand=True)
+    canvas1.flush_events()
 
     # Rules plot
-    rule_fig_width = max(6, len(rules) * 0.4) if not rules.empty else 6
-    fig2, ax2 = plt.subplots(figsize=(rule_fig_width, 3))
+    rule_fig_width = max(5, min(len(rules) * 0.3, 8)) if not rules.empty else 5
+    fig2, ax2 = plt.subplots(figsize=(rule_fig_width, 2.5))
     if not rules.empty:
         rule_labels = [f"{', '.join(list(rule['antecedents']))} → {', '.join(list(rule['consequents']))}" for _, rule in rules.iterrows()]
         ax2.bar(rule_labels, rules['confidence'], color='lightgreen', edgecolor='black')
         ax2.set_xlabel('Association Rules')
         ax2.set_ylabel('Confidence')
-        ax2.set_title(f'Confidence of Association Rules (min_confidence={min_confidence})')
-        plt.xticks(rotation=45, ha='right')
+        ax2.set_title(f'Rules Confidence (min_confidence={min_confidence})')
+        plt.xticks(rotation=45, ha='right', fontsize=8)
     else:
         ax2.text(0.5, 0.5, 'No rules to plot', horizontalalignment='center', verticalalignment='center')
         ax2.set_xlabel('Association Rules')
         ax2.set_ylabel('Confidence')
-        ax2.set_title(f'Confidence of Association Rules (min_confidence={min_confidence})')
+        ax2.set_title(f'Rules Confidence (min_confidence={min_confidence})')
     plt.tight_layout()
-    canvas2 = FigureCanvasTkAgg(fig2, master=rules_plot_canvas)
+    canvas2 = FigureCanvasTkAgg(fig2, master=rules_plot_frame)
     canvas2.draw()
-    canvas2.get_tk_widget().pack(side='left', fill='both', expand=True)
-    rules_plot_canvas.configure(scrollregion=rules_plot_canvas.bbox('all'))
+    canvas2.get_tk_widget().pack(fill='both', expand=True)
+    canvas2.flush_events()
 
     log_progress(progress_text, "Analysis complete.")
 
@@ -216,11 +219,11 @@ def run_analysis(min_support_entry, min_confidence_entry, progress_text, itemset
 # GUI setup
 root = tk.Tk()
 root.title("Frequent Pattern Mining GUI")
-root.geometry("1400x900")  # Increased window size for better fit
+root.geometry("1200x800")
 
 # Input frame
 input_frame = tk.Frame(root)
-input_frame.pack(pady=10, padx=10, fill='x')
+input_frame.pack(pady=5, padx=5, fill='x')
 
 tk.Label(input_frame, text="Minimum Support (e.g., 0.02 for 2%):").grid(row=0, column=0, padx=5, pady=5)
 min_support_entry = tk.Entry(input_frame)
@@ -234,59 +237,73 @@ min_confidence_entry.grid(row=1, column=1, padx=5, pady=5)
 
 # Progress log
 progress_frame = tk.LabelFrame(root, text="Progress Log")
-progress_frame.pack(pady=10, padx=10, fill='both', expand=True)
-progress_text = tk.Text(progress_frame, height=5, state='disabled')
+progress_frame.pack(pady=5, padx=5, fill='both', expand=False)
+progress_text = tk.Text(progress_frame, height=4, state='disabled')
 progress_text.pack(fill='both', expand=True)
 
+# Notebook for tabs
+notebook = ttk.Notebook(root)
+notebook.pack(pady=5, padx=5, fill='both', expand=True)
+
+# Tables tab
+tables_tab = tk.Frame(notebook)
+notebook.add(tables_tab, text="Tables")
+
 # Itemsets table
-itemsets_frame = tk.LabelFrame(root, text="Maximal Frequent Itemsets")
-itemsets_frame.pack(pady=10, padx=10, fill='both', expand=True)
-itemsets_tree = ttk.Treeview(itemsets_frame, columns=('Itemset', 'Support'), show='headings')
+itemsets_frame = tk.LabelFrame(tables_tab, text="Maximal Frequent Itemsets")
+itemsets_frame.pack(pady=5, padx=5, fill='both', expand=True)
+itemsets_scrollbar_y = ttk.Scrollbar(itemsets_frame, orient='vertical')
+itemsets_scrollbar_y.pack(side='right', fill='y')
+itemsets_scrollbar_x = ttk.Scrollbar(itemsets_frame, orient='horizontal')
+itemsets_scrollbar_x.pack(side='bottom', fill='x')
+itemsets_tree = ttk.Treeview(itemsets_frame, columns=('Itemset', 'Support'), show='headings', yscrollcommand=itemsets_scrollbar_y.set, xscrollcommand=itemsets_scrollbar_x.set)
 itemsets_tree.heading('Itemset', text='Itemset')
 itemsets_tree.heading('Support', text='Support')
+itemsets_tree.column('Itemset', width=400)
+itemsets_tree.column('Support', width=100)
 itemsets_tree.pack(fill='both', expand=True)
+itemsets_scrollbar_y.config(command=itemsets_tree.yview)
+itemsets_scrollbar_x.config(command=itemsets_tree.xview)
 
 # Rules table
-rules_frame = tk.LabelFrame(root, text="Association Rules")
-rules_frame.pack(pady=10, padx=10, fill='both', expand=True)
-rules_tree = ttk.Treeview(rules_frame, columns=('Antecedents', 'Consequents', 'Support', 'Confidence', 'Lift'), show='headings')
+rules_frame = tk.LabelFrame(tables_tab, text="Association Rules")
+rules_frame.pack(pady=5, padx=5, fill='both', expand=True)
+rules_scrollbar_y = ttk.Scrollbar(rules_frame, orient='vertical')
+rules_scrollbar_y.pack(side='right', fill='y')
+rules_scrollbar_x = ttk.Scrollbar(rules_frame, orient='horizontal')
+rules_scrollbar_x.pack(side='bottom', fill='x')
+rules_tree = ttk.Treeview(rules_frame, columns=('Antecedents', 'Consequents', 'Support', 'Confidence', 'Lift'), show='headings', yscrollcommand=rules_scrollbar_y.set, xscrollcommand=rules_scrollbar_x.set)
 rules_tree.heading('Antecedents', text='Antecedents')
 rules_tree.heading('Consequents', text='Consequents')
 rules_tree.heading('Support', text='Support')
 rules_tree.heading('Confidence', text='Confidence')
 rules_tree.heading('Lift', text='Lift')
+rules_tree.column('Antecedents', width=200)
+rules_tree.column('Consequents', width=200)
+rules_tree.column('Support', width=100)
+rules_tree.column('Confidence', width=100)
+rules_tree.column('Lift', width=100)
 rules_tree.pack(fill='both', expand=True)
+rules_scrollbar_y.config(command=rules_tree.yview)
+rules_scrollbar_x.config(command=rules_tree.xview)
 
-# Plots with scrollable canvas
-itemsets_plot_frame = tk.LabelFrame(root, text="Top 20 Maximal Frequent Itemsets Plot")
-itemsets_plot_frame.pack(pady=10, padx=10, fill='both', expand=True)
-itemsets_canvas = tk.Canvas(itemsets_plot_frame)
-itemsets_scrollbar_x = ttk.Scrollbar(itemsets_plot_frame, orient='horizontal', command=itemsets_canvas.xview)
-itemsets_scrollbar_x.pack(side='bottom', fill='x')
-itemsets_scrollbar_y = ttk.Scrollbar(itemsets_plot_frame, orient='vertical', command=itemsets_canvas.yview)
-itemsets_scrollbar_y.pack(side='right', fill='y')
-itemsets_plot_canvas = tk.Frame(itemsets_canvas)
-itemsets_canvas.create_window((0, 0), window=itemsets_plot_canvas, anchor='nw')
-itemsets_canvas.configure(xscrollcommand=itemsets_scrollbar_x.set, yscrollcommand=itemsets_scrollbar_y.set)
-itemsets_canvas.pack(fill='both', expand=True)
+# Plots tab
+plots_tab = tk.Frame(notebook)
+notebook.add(plots_tab, text="Plots")
 
-rules_plot_frame = tk.LabelFrame(root, text="Association Rules Confidence Plot")
-rules_plot_frame.pack(pady=10, padx=10, fill='both', expand=True)
-rules_canvas = tk.Canvas(rules_plot_frame)
-rules_scrollbar_x = ttk.Scrollbar(rules_plot_frame, orient='horizontal', command=rules_canvas.xview)
-rules_scrollbar_x.pack(side='bottom', fill='x')
-rules_scrollbar_y = ttk.Scrollbar(rules_plot_frame, orient='vertical', command=rules_canvas.yview)
-rules_scrollbar_y.pack(side='right', fill='y')
-rules_plot_canvas = tk.Frame(rules_canvas)
-rules_canvas.create_window((0, 0), window=rules_plot_canvas, anchor='nw')
-rules_canvas.configure(xscrollcommand=rules_scrollbar_x.set, yscrollcommand=rules_scrollbar_y.set)
-rules_canvas.pack(fill='both', expand=True)
+# Itemsets plot frame
+itemsets_plot_frame = tk.LabelFrame(plots_tab, text="Top 20 Maximal Frequent Itemsets Plot")
+itemsets_plot_frame.pack(pady=5, padx=5, fill='both', expand=True)
+
+# Rules plot frame
+rules_plot_frame = tk.LabelFrame(plots_tab, text="Association Rules Confidence Plot")
+rules_plot_frame.pack(pady=5, padx=5, fill='both', expand=True)
 
 # Run button
 run_button = tk.Button(input_frame, text="Run Analysis",
                        command=lambda: run_analysis(min_support_entry, min_confidence_entry,
                                                    progress_text, itemsets_tree, rules_tree,
-                                                   itemsets_plot_canvas, rules_plot_canvas))
-run_button.grid(row=2, column=0, columnspan=2, pady=10)
+                                                   itemsets_plot_frame, rules_plot_frame))
+run_button.grid(row=2, column=0, columnspan=2, pady=5)
 
 root.mainloop()
