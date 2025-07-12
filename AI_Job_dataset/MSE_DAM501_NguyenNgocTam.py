@@ -171,15 +171,19 @@ def run_analysis(min_support_entry, min_confidence_entry, max_len_entry, progres
     summary_text.config(state='disabled')
 
     log_progress(progress_text, "Rendering plots...")
+
+    # Consistent figure size for all plots
+    plot_width = 10  # Fixed width for consistency across plots
+    plot_height = 4  # Fixed height for consistency across plots
+
     # Itemsets plot (in Plots tab)
     top_20_itemsets = maximal_itemsets.sort_values(by='support', ascending=False).head(20)
     itemset_labels = [', '.join(list(itemset)) for itemset in top_20_itemsets['itemsets']]
-    itemset_fig_width = max(6, min(len(itemset_labels) * 0.4, 12))
-    fig1, ax1 = plt.subplots(figsize=(itemset_fig_width, 4))
+    fig1, ax1 = plt.subplots(figsize=(plot_width, plot_height))
     ax1.bar(itemset_labels, top_20_itemsets['support'], color='skyblue', edgecolor='black')
     ax1.set_xlabel('Itemsets', fontsize=10)
     ax1.set_ylabel('Support', fontsize=10)
-    ax1.set_title(f'Top 20 Itemsets (min_support={min_support})', fontsize=12)
+    ax1.set_title(f'Top 20 Itemsets (min_support={min_support:.2f})', fontsize=12)
     plt.xticks(rotation=45, ha='right', fontsize=9)
     plt.tight_layout()
     canvas1 = FigureCanvasTkAgg(fig1, master=itemsets_plot_frame)
@@ -187,24 +191,25 @@ def run_analysis(min_support_entry, min_confidence_entry, max_len_entry, progres
     canvas1.get_tk_widget().pack(fill='both', expand=True)
     canvas1.flush_events()
 
-    # Rules plots (in Rules Plots tab)
+    # Rules plots (in separate tabs)
     top_20_rules = rules.sort_values(by='confidence', ascending=False).head(20)
-    
+
     # Bar plot: Top 20 rules by confidence
-    rule_fig_width = max(6, min(len(top_20_rules) * 0.4, 12)) if not top_20_rules.empty else 6
-    fig2, ax2 = plt.subplots(figsize=(rule_fig_width, 4))
+    fig2, ax2 = plt.subplots(figsize=(plot_width, plot_height))
     if not top_20_rules.empty:
-        rule_labels = [f"Rule {i+1}" for i in range(len(top_20_rules))]  # Use Rule 1, Rule 2, ... for brevity
+        rule_labels = [f"Rule {i+1}" for i in range(len(top_20_rules))]
         ax2.bar(rule_labels, top_20_rules['confidence'], color='lightgreen', edgecolor='black')
         ax2.set_xlabel('Association Rules (See Tables tab for details)', fontsize=10)
         ax2.set_ylabel('Confidence', fontsize=10)
-        ax2.set_title(f'Top 20 Rules by Confidence (min_confidence={min_confidence})', fontsize=12)
+        ax2.set_title(f'Top 20 Rules by Confidence (min_confidence={min_confidence:.2f})', fontsize=12)
+        ax2.set_ylim(0, 1)  # Standardize y-axis to [0,1] for confidence
         plt.xticks(rotation=45, ha='right', fontsize=9)
     else:
         ax2.text(0.5, 0.5, 'No rules to plot', horizontalalignment='center', verticalalignment='center', fontsize=10)
         ax2.set_xlabel('Association Rules', fontsize=10)
         ax2.set_ylabel('Confidence', fontsize=10)
-        ax2.set_title(f'Top 20 Rules by Confidence (min_confidence={min_confidence})', fontsize=12)
+        ax2.set_title(f'Top 20 Rules by Confidence (min_confidence={min_confidence:.2f})', fontsize=12)
+        ax2.set_ylim(0, 1)
     plt.tight_layout()
     canvas2 = FigureCanvasTkAgg(fig2, master=rules_bar_plot_frame)
     canvas2.draw()
@@ -212,20 +217,33 @@ def run_analysis(min_support_entry, min_confidence_entry, max_len_entry, progres
     canvas2.flush_events()
 
     # Scatter plot: Support vs Lift, sized by Confidence
-    fig3, ax3 = plt.subplots(figsize=(8, 4))
+    fig3, ax3 = plt.subplots(figsize=(plot_width, plot_height))
     if not top_20_rules.empty:
-        ax3.scatter(top_20_rules['support'], top_20_rules['lift'], 
-                    s=top_20_rules['confidence'] * 500, alpha=0.6, c='purple')
+        # Scale point sizes to avoid overly large or small points
+        point_sizes = top_20_rules['confidence'] * 300  # Reduced from 500 for better proportionality
+        scatter = ax3.scatter(top_20_rules['support'], top_20_rules['lift'], 
+                              s=point_sizes, alpha=0.6, c='purple')
         ax3.set_xlabel('Support', fontsize=10)
         ax3.set_ylabel('Lift', fontsize=10)
         ax3.set_title(f'Top 20 Rules: Support vs Lift (Size = Confidence)', fontsize=12)
+        # Set reasonable axis limits based on data
+        ax3.set_xlim(0, max(top_20_rules['support'].max() * 1.1, min_support))
+        ax3.set_ylim(0, max(top_20_rules['lift'].max() * 1.1, 1.0))
+        # Add annotations with adjusted positioning to reduce overlap
         for i, (index, row) in enumerate(top_20_rules.iterrows()):
-            ax3.annotate(f"{i+1}", (row['support'], row['lift']), fontsize=7, xytext=(5, 5), textcoords='offset points')
+            ax3.annotate(f"{i+1}", (row['support'], row['lift']), fontsize=7, 
+                         xytext=(5, 5), textcoords='offset points', ha='left', va='bottom')
+        # Add a legend for point sizes
+        sizes = [0.2, 0.5, 0.8]  # Example confidence values for legend
+        legend_points = [ax3.scatter([], [], s=s * 300, c='purple', alpha=0.6, label=f'Conf: {s:.1f}') for s in sizes]
+        ax3.legend(handles=legend_points, title='Confidence', fontsize=8, loc='upper right')
     else:
         ax3.text(0.5, 0.5, 'No rules to plot', horizontalalignment='center', verticalalignment='center', fontsize=10)
         ax3.set_xlabel('Support', fontsize=10)
         ax3.set_ylabel('Lift', fontsize=10)
         ax3.set_title(f'Top 20 Rules: Support vs Lift (Size = Confidence)', fontsize=12)
+        ax3.set_xlim(0, min_support * 2)
+        ax3.set_ylim(0, 2)
     plt.tight_layout()
     canvas3 = FigureCanvasTkAgg(fig3, master=rules_scatter_plot_frame)
     canvas3.draw()
@@ -234,7 +252,7 @@ def run_analysis(min_support_entry, min_confidence_entry, max_len_entry, progres
 
     log_progress(progress_text, "Analysis complete.")
 
-    # Chart.js configurations (for reference)
+    # Chart.js configurations (updated for consistency)
     chartjs_itemsets = {
         "type": "bar",
         "data": {
@@ -248,18 +266,20 @@ def run_analysis(min_support_entry, min_confidence_entry, max_len_entry, progres
             }]
         },
         "options": {
+            "maintainAspectRatio": False,  # Allow flexible resizing
             "scales": {
                 "y": {
                     "beginAtZero": True,
                     "title": { "display": True, "text": "Support", "font": { "size": 12 } }
                 },
                 "x": {
-                    "title": { "display": True, "text": "Itemsets", "font": { "size": 12 } }
+                    "title": { "display": True, "text": "Itemsets", "font": { "size": 12 } },
+                    "ticks": { "autoSkip": False, "maxRotation": 45, "minRotation": 45, "font": { "size": 9 } }
                 }
             },
             "plugins": {
                 "legend": { "display": True, "labels": { "font": { "size": 12 } } },
-                "title": { "display": True, "text": f"Top 20 Maximal Frequent Itemsets by Support (min_support={min_support})", "font": { "size": 14 } }
+                "title": { "display": True, "text": f"Top 20 Maximal Frequent Itemsets by Support (min_support={min_support:.2f})", "font": { "size": 14 } }
             }
         }
     }
@@ -277,18 +297,21 @@ def run_analysis(min_support_entry, min_confidence_entry, max_len_entry, progres
             }]
         },
         "options": {
+            "maintainAspectRatio": False,  # Allow flexible resizing
             "scales": {
                 "y": {
                     "beginAtZero": True,
+                    "max": 1,  # Standardize y-axis to [0,1]
                     "title": { "display": True, "text": "Confidence", "font": { "size": 12 } }
                 },
                 "x": {
-                    "title": { "display": True, "text": "Association Rules (See Tables tab for details)", "font": { "size": 12 } }
+                    "title": { "display": True, "text": "Association Rules (See Tables tab for details)", "font": { "size": 12 } },
+                    "ticks": { "autoSkip": False, "maxRotation": 45, "minRotation": 45, "font": { "size": 9 } }
                 }
             },
             "plugins": {
                 "legend": { "display": True, "labels": { "font": { "size": 12 } } },
-                "title": { "display": True, "text": f"Top 20 Association Rules by Confidence (min_confidence={min_confidence})", "font": { "size": 14 } }
+                "title": { "display": True, "text": f"Top 20 Rules by Confidence (min_confidence={min_confidence:.2f})", "font": { "size": 14 } }
             }
         }
     }
@@ -298,20 +321,23 @@ def run_analysis(min_support_entry, min_confidence_entry, max_len_entry, progres
         "data": {
             "datasets": [{
                 "label": "Rules",
-                "data": [{"x": row['support'], "y": row['lift'], "r": row['confidence'] * 25} for _, row in top_20_rules.iterrows()] if not top_20_rules.empty else [],
+                "data": [{"x": row['support'], "y": row['lift'], "r": row['confidence'] * 15} for _, row in top_20_rules.iterrows()] if not top_20_rules.empty else [],  # Reduced radius scaling
                 "backgroundColor": "purple",
                 "borderColor": "#ffffff",
                 "borderWidth": 1
             }]
         },
         "options": {
+            "maintainAspectRatio": False,  # Allow flexible resizing
             "scales": {
                 "y": {
                     "beginAtZero": True,
-                    "title": { "display": True, "text": "Lift", "font": { "size": 12 } }
+                    "title": { "display": True, "text": "Lift", "font": { "size": 12 } },
+                    "max": max(top_20_rules['lift'].max() * 1.1, 1.0) if not top_20_rules.empty else 2
                 },
                 "x": {
-                    "title": { "display": True, "text": "Support", "font": { "size": 12 } }
+                    "title": { "display": True, "text": "Support", "font": { "size": 12 } },
+                    "max": max(top_20_rules['support'].max() * 1.1, min_support) if not top_20_rules.empty else min_support * 2
                 }
             },
             "plugins": {
@@ -321,11 +347,11 @@ def run_analysis(min_support_entry, min_confidence_entry, max_len_entry, progres
         }
     }
 
-    print(f"\nChart.js Configuration for Top 20 Maximal Frequent Itemsets (min_support={min_support}):")
+    print(f"\nChart.js Configuration for Top 20 Maximal Frequent Itemsets (min_support={min_support:.2f}):")
     print(json.dumps(chartjs_itemsets, indent=2))
-    print(f"\nChart.js Configuration for Top 20 Association Rules (Bar, min_confidence={min_confidence}):")
+    print(f"\nChart.js Configuration for Top 20 Association Rules (Bar, min_confidence={min_confidence:.2f}):")
     print(json.dumps(chartjs_rules_bar, indent=2))
-    print(f"\nChart.js Configuration for Top 20 Association Rules (Scatter, min_confidence={min_confidence}):")
+    print(f"\nChart.js Configuration for Top 20 Association Rules (Scatter, min_confidence={min_confidence:.2f}):")
     print(json.dumps(chartjs_rules_scatter, indent=2))
 
 # GUI setup
@@ -409,22 +435,26 @@ rules_scrollbar_x.config(command=rules_tree.xview)
 
 # Plots tab (only itemsets)
 plots_tab = tk.Frame(notebook)
-notebook.add(plots_tab, text="Plots")
+notebook.add(plots_tab, text="Itemsets Plot")
 
 # Itemsets plot frame
 itemsets_plot_frame = tk.LabelFrame(plots_tab, text="Top 20 Maximal Frequent Itemsets Plot", font=('Arial', 12))
 itemsets_plot_frame.pack(pady=5, padx=5, fill='both', expand=True)
 
-# Rules Plots tab
-rules_plots_tab = tk.Frame(notebook)
-notebook.add(rules_plots_tab, text="Rules Plots")
+# Rules Bar Plot tab
+rules_bar_tab = tk.Frame(notebook)
+notebook.add(rules_bar_tab, text="Rules Bar Plot")
 
 # Rules bar plot frame
-rules_bar_plot_frame = tk.LabelFrame(rules_plots_tab, text="Top 20 Rules by Confidence", font=('Arial', 12))
+rules_bar_plot_frame = tk.LabelFrame(rules_bar_tab, text="Top 20 Rules by Confidence", font=('Arial', 12))
 rules_bar_plot_frame.pack(pady=5, padx=5, fill='both', expand=True)
 
+# Rules Scatter Plot tab
+rules_scatter_tab = tk.Frame(notebook)
+notebook.add(rules_scatter_tab, text="Rules Scatter Plot")
+
 # Rules scatter plot frame
-rules_scatter_plot_frame = tk.LabelFrame(rules_plots_tab, text="Top 20 Rules: Support vs Lift", font=('Arial', 12))
+rules_scatter_plot_frame = tk.LabelFrame(rules_scatter_tab, text="Top 20 Rules: Support vs Lift", font=('Arial', 12))
 rules_scatter_plot_frame.pack(pady=5, padx=5, fill='both', expand=True)
 
 # Summary tab
